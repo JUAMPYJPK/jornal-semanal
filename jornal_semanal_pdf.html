@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Jornal Semanal</title>
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    padding: 20px;
+}
+h2 {
+    text-align: center;
+}
+.periodo {
+    margin-bottom: 15px;
+    background: #fff;
+    padding: 10px;
+    border: 1px solid #ccc;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 6px;
+    text-align: center;
+}
+input, select {
+    padding: 4px;
+}
+.total {
+    margin-top: 15px;
+    font-size: 18px;
+    font-weight: bold;
+}
+button {
+    margin-top: 10px;
+    padding: 10px;
+    font-size: 15px;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Registro de Jornal Semanal</h2>
+
+<div class="periodo">
+    <label><b>Período de la planilla:</b></label><br><br>
+    Desde: <input type="date" id="desde">
+    Hasta: <input type="date" id="hasta">
+</div>
+
+<label><b>Valor hora ($):</b></label>
+<input type="number" id="valorHora" value="0"><br><br>
+
+<table>
+<thead>
+<tr>
+<th>Día</th>
+<th>Ingreso</th>
+<th>AM/PM</th>
+<th>Egreso</th>
+<th>AM/PM</th>
+</tr>
+</thead>
+<tbody id="tablaDias"></tbody>
+</table>
+
+<div class="total">
+Total a cobrar: $<span id="total">0</span>
+</div>
+
+<button onclick="finalizar()">Finalizar jornal semanal</button>
+<button onclick="exportarPDF()">Exportar a PDF</button>
+
+<script>
+const dias = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const tabla = document.getElementById("tablaDias");
+
+dias.forEach(dia => {
+    tabla.innerHTML += `
+    <tr>
+        <td>${dia}</td>
+        <td><input type="time"></td>
+        <td>
+            <select>
+                <option>AM</option>
+                <option>PM</option>
+            </select>
+        </td>
+        <td><input type="time"></td>
+        <td>
+            <select>
+                <option>AM</option>
+                <option>PM</option>
+            </select>
+        </td>
+    </tr>`;
+});
+
+function convertirHora(hora, ampm) {
+    let [h, m] = hora.split(":").map(Number);
+    if (ampm === "PM" && h < 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+    return h + m / 60;
+}
+
+function finalizar() {
+    const valorHora = Number(document.getElementById("valorHora").value);
+    let totalHoras = 0;
+
+    [...tabla.rows].forEach(row => {
+        const ingreso = row.cells[1].children[0].value;
+        const ingresoAP = row.cells[2].children[0].value;
+        const egreso = row.cells[3].children[0].value;
+        const egresoAP = row.cells[4].children[0].value;
+
+        if (ingreso && egreso) {
+            const h1 = convertirHora(ingreso, ingresoAP);
+            const h2 = convertirHora(egreso, egresoAP);
+            if (h2 > h1) totalHoras += (h2 - h1);
+        }
+    });
+
+    document.getElementById("total").textContent =
+        (totalHoras * valorHora).toFixed(2);
+}
+
+function exportarPDF() {
+    finalizar();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let y = 10;
+    doc.setFontSize(14);
+    doc.text("Jornal Semanal", 10, y);
+
+    y += 8;
+    doc.setFontSize(10);
+
+    const desde = document.getElementById("desde").value;
+    const hasta = document.getElementById("hasta").value;
+
+    if (desde && hasta) {
+        doc.text(`Período: ${desde} al ${hasta}`, 10, y);
+        y += 8;
+    }
+
+    const valorHora = document.getElementById("valorHora").value;
+    doc.text(`Valor hora: $${valorHora}`, 10, y);
+    y += 8;
+
+    [...tabla.rows].forEach(row => {
+        const dia = row.cells[0].innerText;
+        const ing = row.cells[1].children[0].value;
+        const ingAP = row.cells[2].children[0].value;
+        const egr = row.cells[3].children[0].value;
+        const egrAP = row.cells[4].children[0].value;
+
+        if (ing && egr) {
+            doc.text(
+                `${dia}: ${ing} ${ingAP} - ${egr} ${egrAP}`,
+                10,
+                y
+            );
+            y += 6;
+        }
+    });
+
+    y += 6;
+    doc.setFontSize(12);
+    doc.text(
+        `Total a cobrar: $${document.getElementById("total").innerText}`,
+        10,
+        y
+    );
+
+    doc.save("jornal_semanal.pdf");
+}
+</script>
+
+</body>
+</html>
